@@ -38,3 +38,6 @@
 *.ptx
 *.cubin
 *.fatbin
+
+.vimrc
+main
