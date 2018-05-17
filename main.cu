@@ -7,7 +7,7 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
-#include <SDL2/SDL_image.h>
+//#include <SDL2/SDL_image.h>
 
 using namespace std;
 
@@ -378,7 +378,7 @@ void display(SDL_Window* window)
       if(cudaSuccess != cudaMemcpy(verts, dverts, 3*N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(times, dtimes,   N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(colors,dcolors,3*N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
-      cout << endl;
+      //cout << endl;
     }
     else {
       step_cpu(verts, pvels, times, colors, N);
@@ -477,7 +477,7 @@ void physics()
       if(cudaSuccess != cudaMemcpy(verts, dverts, 3*N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(times, dtimes,   N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(colors,dcolors,3*N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
-      cout << endl;
+      //cout << endl;
     }
     else {
       step_cpu(verts, pvels, times, colors, N);
@@ -698,11 +698,14 @@ int main(int argc, char *argv[])
   //memset(verts, 0.0, 3*N*sizeof(float));
   //memset(pvels  ,0.0, 3*N*sizeof(float));
   for (int i=0; i < 3*N; ++i) {
+    verts[i] = ((float)rand()/(float)RAND_MAX - 0.5)/1000.0;
     pvels[i] = ((float)rand()/(float)RAND_MAX - 0.5)/1000.0;
-    pvels[i] = ((float)rand()/(float)RAND_MAX - 0.5)/1000.0;
+    //verts[i] = 0;
+    //pvels[i] = 0;
   }
   for (int i=0; i < N; ++i)
     times[i]= ((float)rand()/(float)RAND_MAX);
+    //times[i]= 0;
 
   //allocate particle  and grid arrays
   if(cudaSuccess != cudaMalloc(&dverts, 3*N*sizeof(float))) cout << "failure to allocate\n";;
