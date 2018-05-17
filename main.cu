@@ -98,7 +98,7 @@ void keyboard(const Uint8* state);
 //typedef cudaTextureObject_t cudaTextureObject_t;
 //typedef surface<void,cudaSurfaceType3D> surface<void,cudaSurfaceType3D>;
 
-// hand-written texture lookup function
+// non-texture-memory texture lookup function
 __device__ float4 tex3d(float4* tex, float r, float s, float t, int s_r, int s_s, int s_t) {
   int r1 = floor(r);
   int r2 = ceil(r); r2 = r2%s_r;
@@ -723,15 +723,17 @@ int main(int argc, char *argv[])
   if(cudaSuccess != cudaMalloc(&d_gpres[1],  M*M*M*sizeof(float))) cout << "failure to allocate\n";;
   if(cudaSuccess != cudaMalloc(&d_diverge,   M*M*M*sizeof(float))) cout << "failure to allocate\n";;
 
-  if(cudaSuccess != cudaMemcpy(&d_gvels[0], &zeros, 4*M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
-  if(cudaSuccess != cudaMemcpy(&d_gvels[1], &zeros, 4*M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
-  if(cudaSuccess != cudaMemcpy(&d_gtemp[0], &zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
-  if(cudaSuccess != cudaMemcpy(&d_gtemp[1], &zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
-  if(cudaSuccess != cudaMemcpy(&d_gdens[0], &zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
-  if(cudaSuccess != cudaMemcpy(&d_gdens[1], &zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
-  if(cudaSuccess != cudaMemcpy(&d_gpres[0], &zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
-  if(cudaSuccess != cudaMemcpy(&d_gpres[1], &zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
-  if(cudaSuccess != cudaMemcpy(&d_diverge,  &zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy\n";;
+  //memset(zeros, 0.0, 4*M*M*M*sizeof(float));
+  cudaError_t err;
+  err = cudaMemcpy(&d_gvels[0], zeros, 4*M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(&d_gvels[1], zeros, 4*M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(&d_gtemp[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(&d_gtemp[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(&d_gdens[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(&d_gdens[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(&d_gpres[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(&d_gpres[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(&d_diverge,  zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
 
   //////////////////////////////////////////////////////
 
