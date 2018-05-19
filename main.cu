@@ -466,7 +466,26 @@ void display(SDL_Window* window)
   glDisableClientState(GL_COLOR_ARRAY);
 
   // show velocities for debug purposes
-  cudaError_t err = cudaMemcpy(h_gvels, d_gvels[ping], 4*M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;;
+  //cudaError_t err = cudaMemcpy(h_gvels, d_gvels[ping], 4*M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;;
+  //glUseProgram(0);
+  //glBegin(GL_LINES);
+  //for (int i=0; i < M; ++i) {
+  //  for (int j=0; j < M; ++j) {
+  //    for (int k=0; k < M; ++k) {
+  //      glColor3f(1.0,1.0,0.0);
+  //      glVertex3f(i, j, k);
+  //      float x = h_gvels[i*M*M + j*M + k  ]*100000.0;
+  //      float y = h_gvels[i*M*M + j*M + k+1]*100000.0;
+  //      float z = h_gvels[i*M*M + j*M + k+2]*100000.0;
+  //      glColor3f(0.1,0.1,0.0);
+  //      glVertex3f(i+x, j+y, k+z);
+  //    }
+  //  }
+  //}
+  //glEnd();
+
+  // show other values for debug purposes
+  cudaError_t err = cudaMemcpy(h_gtemp, d_gtemp[ping], M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;;
   glUseProgram(0);
   glBegin(GL_LINES);
   for (int i=0; i < M; ++i) {
@@ -474,11 +493,9 @@ void display(SDL_Window* window)
       for (int k=0; k < M; ++k) {
         glColor3f(1.0,1.0,0.0);
         glVertex3f(i, j, k);
-        float x = h_gvels[i*M*M + j*M + k  ]*100000.0;
-        float y = h_gvels[i*M*M + j*M + k+1]*100000.0;
-        float z = h_gvels[i*M*M + j*M + k+2]*100000.0;
+        float x = h_gvels[i*M*M + j*M + k]/10.0;
         glColor3f(0.1,0.1,0.0);
-        glVertex3f(i+x, j+y, k+z);
+        glVertex3f(i+x, j, k);
       }
     }
   }
