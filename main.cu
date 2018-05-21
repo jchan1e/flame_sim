@@ -25,7 +25,7 @@ int h = 1080;
 double ex = 0;
 double ey = 0;
 double ez = 0;
-double zoom = 16;
+double zoom = 24;
 double dzoom = 0;
 double th = 0;
 double ph = 0;
@@ -49,6 +49,7 @@ int ping = 0;
 int pong = 1;
 
 float zeros[M*M*M*4] = {0.0};
+float ones[M*M*M]    = {1.0};
 
 //Particle Arrays
 float* verts  = NULL;
@@ -159,7 +160,7 @@ __global__ void pstep(float4* gvels, float* gtemp, float* verts, float* times, f
   times[I] -= 0.001f;
   colors[i  ] = sqrt(times[I]);
   colors[i+1] = max(times[I]/1.125f, 0.0f);
-  colors[i+2] = pow(times[I],2.0f);
+  colors[i+2] = pow(times[I],2.0f)/2;
 
   //// update grid temperatures
   //if (times[I] > 0.0) {
@@ -172,23 +173,23 @@ __global__ void pstep(float4* gvels, float* gtemp, float* verts, float* times, f
 
   // TODO: move this to the CPU and initialize position randomly within a sphere
   // reset particle's location
-  if (times[I]   < 0.0 ||
-      verts[i]   < 0.0 ||
-      verts[i]   > M   ||
-      verts[i+1] < 0.0 ||
-      verts[i+1] > M   ||
-      verts[i+2] < 0.0 ||
-      verts[i+1] > M  ) {
-    times[I]   = 1.0f;
-    verts[i  ] = V.x*100 + M/2;
-    verts[i+1] = V.y*100 + M/2;
-    verts[i+2] = V.z*100 + 5.0;
-  }
+  //if (times[I]   < 0.0 ||
+  //    verts[i]   < 0.0 ||
+  //    verts[i]   > M   ||
+  //    verts[i+1] < 0.0 ||
+  //    verts[i+1] > M   ||
+  //    verts[i+2] < 0.0 ||
+  //    verts[i+1] > M  ) {
+  //  times[I]   = 1.0f;
+  //  verts[i  ] = V.x*100 + M/2;
+  //  verts[i+1] = V.y*100 + M/2;
+  //  verts[i+2] = V.z*100 + 5.0;
+  //}
 }
 
 __device__ void advect(float4* vels, float* src, float* dest, float dissipation,
                        int I, int J, int K) {
-  float dt = 0.016;
+  float dt = -0.016;
 
   float4 v = tex3d(vels, I, J, K,  M,M,M);
   float i = dt*v.x;
@@ -217,8 +218,10 @@ __global__ void advect(float4* vels, float4* src_vels, float4* dst_vels, float* 
   advect(vels, src_temp, dst_temp, 0.99  ,  I, J, K);
   advect(vels, src_dens, dst_dens, 0.9999,  I, J, K);
 
-  if (I*2 == M && J*2 == M && K == 5) {
-    dst_temp[I*M*M + J*M + K] = 100.0;
+  if (  (I*2 == M || I*2-1 == M || I*2+1 == M) &&
+        (J*2 == M || J*2-1 == M || J*2+1 == M) &&
+        (  K == 3 ||     K == 4 ||     K == 5)) {
+    dst_temp[I*M*M + J*M + K] += 40.0;
   }
 }
 
@@ -232,10 +235,18 @@ __global__ void buoyancy(float4* gvels, float* gtemp, float* gdens, float4* vdes
   float sigma = 1.0;
   float kappa = 0.05;
 
-  float T =  gtemp[i*M*M + j*M + k];
   float4 V = gvels[i*M*M + j*M + k];
-  float D =  gdens[i*M*M + j*M + k];
-  V.z += dt * ((T - ambient) * sigma - D * kappa);
+  float T =  gtemp[i*M*M + j*M + k];
+  //float D =  gdens[i*M*M + j*M + k];
+  float D = -tex3d(gdens, i  , j  , k  , M,M,M) +
+             tex3d(gdens, i+1, j  , k  , M,M,M) +
+             tex3d(gdens, i-1, j  , k  , M,M,M) +
+             tex3d(gdens, i  , j+1, k  , M,M,M) +
+             tex3d(gdens, i  , j-1, k  , M,M,M) +
+             tex3d(gdens, i  , j  , k+1, M,M,M) +
+             tex3d(gdens, i  , j  , k-1, M,M,M);
+             
+  V.z += dt * ((T - ambient) * sigma + D * kappa);
   vdest[i*M*M + j*M + k] = V;
 }
 
@@ -380,6 +391,8 @@ void display(SDL_Window* window)
   //// Step Flame Animation ////
   if (stepmode) {
     if (gpu) {
+      if(cudaSuccess != cudaMemcpy(d_gpres[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy: " << endl;
+      if(cudaSuccess != cudaMemcpy(d_gpres[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy: " << endl;
       if(cudaSuccess != cudaMemcpy(dverts, verts, 3*N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(dtimes, times,   N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(dcolors,colors,3*N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
@@ -393,6 +406,21 @@ void display(SDL_Window* window)
       if(cudaSuccess != cudaMemcpy(times, dtimes,   N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(colors,dcolors,3*N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       //cout << endl;
+      for (int I=0; I < N; ++I) {
+        int i = I*3;
+        if (times[I]   < 0.0 ||
+        verts[i]   < 0.0 ||
+        verts[i]   > M   ||
+        verts[i+1] < 0.0 ||
+        verts[i+1] > M   ||
+        verts[i+2] < 0.0 ||
+        verts[i+1] > M  ) {
+          times[I]   = 1.0f;
+          verts[i  ] = 4*((float)rand()/(float)RAND_MAX-0.5) + M/2;
+          verts[i+1] = 4*((float)rand()/(float)RAND_MAX-0.5) + M/2;
+          verts[i+2] = 4*((float)rand()/(float)RAND_MAX-0.5) + 5.0;
+        }
+      }
     }
     else {
       step_cpu(verts, pvels, times, colors, N);
@@ -466,26 +494,7 @@ void display(SDL_Window* window)
   glDisableClientState(GL_COLOR_ARRAY);
 
   // show velocities for debug purposes
-  //cudaError_t err = cudaMemcpy(h_gvels, d_gvels[ping], 4*M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;;
-  //glUseProgram(0);
-  //glBegin(GL_LINES);
-  //for (int i=0; i < M; ++i) {
-  //  for (int j=0; j < M; ++j) {
-  //    for (int k=0; k < M; ++k) {
-  //      glColor3f(1.0,1.0,0.0);
-  //      glVertex3f(i, j, k);
-  //      float x = h_gvels[i*M*M + j*M + k  ]*100000.0;
-  //      float y = h_gvels[i*M*M + j*M + k+1]*100000.0;
-  //      float z = h_gvels[i*M*M + j*M + k+2]*100000.0;
-  //      glColor3f(0.1,0.1,0.0);
-  //      glVertex3f(i+x, j+y, k+z);
-  //    }
-  //  }
-  //}
-  //glEnd();
-
-  // show other values for debug purposes
-  cudaError_t err = cudaMemcpy(h_gtemp, d_gtemp[ping], M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;;
+  cudaError_t err = cudaMemcpy(h_gvels, d_gvels[ping], 4*M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;
   glUseProgram(0);
   glBegin(GL_LINES);
   for (int i=0; i < M; ++i) {
@@ -493,13 +502,32 @@ void display(SDL_Window* window)
       for (int k=0; k < M; ++k) {
         glColor3f(1.0,1.0,0.0);
         glVertex3f(i, j, k);
-        float x = h_gvels[i*M*M + j*M + k]/10.0;
+        float x = h_gvels[4*(i*M*M + j*M + k)  ]*30.0;
+        float y = h_gvels[4*(i*M*M + j*M + k)+1]*30.0;
+        float z = h_gvels[4*(i*M*M + j*M + k)+2]*30.0;
         glColor3f(0.1,0.1,0.0);
-        glVertex3f(i+x, j, k);
+        glVertex3f(i+x, j+y, k+z);
       }
     }
   }
   glEnd();
+
+  // show other values for debug purposes
+  //cudaError_t err = cudaMemcpy(h_gtemp, d_gtemp[ping], M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;;
+  //glUseProgram(0);
+  //glBegin(GL_LINES);
+  //for (int i=0; i < M; ++i) {
+  //  for (int j=0; j < M; ++j) {
+  //    for (int k=0; k < M; ++k) {
+  //      glColor3f(1.0,1.0,1.0);
+  //      glVertex3f(i, j, k);
+  //      float x = h_gtemp[i*M*M + j*M + k]*1000000.0;
+  //      glColor3f(1.0,1.0,1.0);
+  //      glVertex3f(i+x, j, k);
+  //    }
+  //  }
+  //}
+  //glEnd();
 
   //swap the buffers
   glFlush();
@@ -743,6 +771,7 @@ int main(int argc, char *argv[])
   }
 
   h_gvels = new float[4*M*M*M];
+  h_gtemp = new float[M*M*M];
 
   verts = new float[3*N];
   pvels = new float[3*N];
@@ -751,9 +780,9 @@ int main(int argc, char *argv[])
   //memset(verts, 0.0, 3*N*sizeof(float));
   //memset(pvels  ,0.0, 3*N*sizeof(float));
   for (int i=0; i < 3*N; i += 3) {
-    verts[i  ] = ((float)rand()/(float)RAND_MAX - 0.5) + M/2;
-    verts[i+1] = ((float)rand()/(float)RAND_MAX - 0.5) + M/2;
-    verts[i+2] = ((float)rand()/(float)RAND_MAX - 0.5) + 5.0;
+    verts[i  ] = 4*((float)rand()/(float)RAND_MAX - 0.5) + M/2;
+    verts[i+1] = 4*((float)rand()/(float)RAND_MAX - 0.5) + M/2;
+    verts[i+2] = 4*((float)rand()/(float)RAND_MAX - 0.5) + 5.0;
     pvels[i  ] = ((float)rand()/(float)RAND_MAX - 0.5)/1000.0;
     pvels[i+1] = ((float)rand()/(float)RAND_MAX - 0.5)/1000.0;
     pvels[i+2] = ((float)rand()/(float)RAND_MAX - 0.5)/1000.0;
@@ -786,11 +815,12 @@ int main(int argc, char *argv[])
   err = cudaMemcpy(d_gvels[1], zeros, 4*M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
   err = cudaMemcpy(d_gtemp[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
   err = cudaMemcpy(d_gtemp[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
-  err = cudaMemcpy(d_gdens[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
-  err = cudaMemcpy(d_gdens[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
   err = cudaMemcpy(d_gpres[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
   err = cudaMemcpy(d_gpres[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
   err = cudaMemcpy(d_diverge,  zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  
+  err = cudaMemcpy(d_gdens[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
+  err = cudaMemcpy(d_gdens[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
 
   //////////////////////////////////////////////////////
 
@@ -859,6 +889,7 @@ int main(int argc, char *argv[])
   delete colors;
 
   delete h_gvels;
+  delete h_gtemp;
 
   SDL_Quit();
 
