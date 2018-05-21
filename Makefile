@@ -38,12 +38,10 @@ shader.o:shader.cpp shader.h
 #	nvcc -c $< -Xcompiler "$(CFLG) -fopenmp"
 
 main.o:main.cu step.cu shader.h objects.h stdGL.h
-	#g++ -c $(CFLG) $(SFLG) $<
 	nvcc $(ARCH) -ccbin g++-4.8 -c -Xcompiler "$(CFLG) $(SFLG) -fPIC -fopenmp" $<
 
 #  link
 main:main.o shader.o objects.o #step.o
-	#g++ -g -O3 -o $@ $^ $(GLIBS) -lSDL2_image -lgomp
 	nvcc $(ARCH) -g -O3 -o $@ $^ -Xlinker "$(GLIBS) -lgomp -fPIC"
 
 
