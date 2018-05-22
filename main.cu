@@ -13,7 +13,7 @@ using namespace std;
 
 //GLOBAL VARIABLES//
 //running or not
-//bool quit = false;
+bool quit = false;
 
 int Pause = 0;
 
@@ -74,7 +74,7 @@ float*  d_gpres[2] = {NULL};
 float*  d_diverge  =  NULL;
 
 //User-controlled Computation Modes
-bool stepmode = true;
+bool stepmode = false;
 bool gpu = true;
 
 ////////////////////
@@ -103,7 +103,7 @@ void keyboard(const Uint8* state);
 __device__ float4 tex3d(float4* tex, float r, float s, float t, int s_r, int s_s, int s_t) {
   int r1 = floor(r); r1 = r1%s_r;
   int r2 = ceil(r);  r2 = r2%s_r;
-  int s1 = floor(s); s1 = s1%s_r;
+  int s1 = floor(s); s1 = s1%s_s;
   int s2 = ceil(s);  s2 = s2%s_s;
   int t1 = floor(t); t1 = max(t1, 0);
   int t2 = ceil(t);  t2 = min(t2, s_t-1);
@@ -111,20 +111,20 @@ __device__ float4 tex3d(float4* tex, float r, float s, float t, int s_r, int s_s
   if (t1 == 0 || t2 == s_t-1)
     return make_float4(0.0,0.0,0.0,0.0);
 
-  float4 a = tex[r1*s_r*s_s + s1*s_s + t1];
-  float4 b = tex[r1*s_r*s_s + s1*s_s + t2];
-  float4 c = tex[r1*s_r*s_s + s2*s_s + t1];
-  float4 d = tex[r1*s_r*s_s + s2*s_s + t2];
-  float4 e = tex[r2*s_r*s_s + s1*s_s + t1];
-  float4 f = tex[r2*s_r*s_s + s1*s_s + t2];
-  float4 g = tex[r2*s_r*s_s + s2*s_s + t1];
-  float4 h = tex[r2*s_r*s_s + s2*s_s + t2];
+  float4 a = tex[r1*s_s*s_t + s1*s_t + t1];
+  float4 b = tex[r1*s_s*s_t + s1*s_t + t2];
+  float4 c = tex[r1*s_s*s_t + s2*s_t + t1];
+  float4 d = tex[r1*s_s*s_t + s2*s_t + t2];
+  float4 e = tex[r2*s_s*s_t + s1*s_t + t1];
+  float4 f = tex[r2*s_s*s_t + s1*s_t + t2];
+  float4 g = tex[r2*s_s*s_t + s2*s_t + t1];
+  float4 h = tex[r2*s_s*s_t + s2*s_t + t2];
   return trilerp(a,b,c,d,e,f,g,h, t-t1,s-s1,r-r1);
 }
 __device__ float tex3d(float* tex, float r, float s, float t, int s_r, int s_s, int s_t) {
   int r1 = floor(r); r1 = r1%s_r;
   int r2 = ceil(r);  r2 = r2%s_r;
-  int s1 = floor(s); s1 = s1%s_r;
+  int s1 = floor(s); s1 = s1%s_s;
   int s2 = ceil(s);  s2 = s2%s_s;
   int t1 = floor(t); t1 = max(t1, 0);
   int t2 = ceil(t);  t2 = min(t2, s_t-1);
@@ -132,14 +132,14 @@ __device__ float tex3d(float* tex, float r, float s, float t, int s_r, int s_s, 
   if (t1 == 0 || t2 == s_t-1)
     return 0.0;
 
-  float a = tex[r1*s_r*s_s + s1*s_s + t1];
-  float b = tex[r1*s_r*s_s + s1*s_s + t2];
-  float c = tex[r1*s_r*s_s + s2*s_s + t1];
-  float d = tex[r1*s_r*s_s + s2*s_s + t2];
-  float e = tex[r2*s_r*s_s + s1*s_s + t1];
-  float f = tex[r2*s_r*s_s + s1*s_s + t2];
-  float g = tex[r2*s_r*s_s + s2*s_s + t1];
-  float h = tex[r2*s_r*s_s + s2*s_s + t2];
+  float a = tex[r1*s_s*s_t + s1*s_t + t1];
+  float b = tex[r1*s_s*s_t + s1*s_t + t2];
+  float c = tex[r1*s_s*s_t + s2*s_t + t1];
+  float d = tex[r1*s_s*s_t + s2*s_t + t2];
+  float e = tex[r2*s_s*s_t + s1*s_t + t1];
+  float f = tex[r2*s_s*s_t + s1*s_t + t2];
+  float g = tex[r2*s_s*s_t + s2*s_t + t1];
+  float h = tex[r2*s_s*s_t + s2*s_t + t2];
   return trilerp(a,b,c,d,e,f,g,h, t-t1,s-s1,r-r1);
 }
 
@@ -189,27 +189,27 @@ __global__ void pstep(float4* gvels, float* gtemp, float* verts, float* times, f
 
 __device__ void advect(float4* vels, float* src, float* dest, float dissipation,
                        int I, int J, int K) {
-  float dt = -0.016;
+  float dt = 0.016;
 
   float4 v = tex3d(vels, I, J, K,  M,M,M);
-  float i = dt*v.x;
-  float j = dt*v.y;
-  float k = dt*v.z;
+  float i = I - dt*v.x;
+  float j = J - dt*v.y;
+  float k = K - dt*v.z;
   float V = dissipation * tex3d(src, i, j, k, M,M,M);
   dest[I*M*M + J*M + K] = V;
 }
 __device__ void advect(float4* vels, float4* src, float4* dest, float dissipation,
                        int I, int J, int K) {
-  float dt = -0.016;
+  float dt = 0.016;
 
   float4 v = tex3d(vels, I, J, K,  M,M,M);
-  float i = dt*v.x;
-  float j = dt*v.y;
-  float k = dt*v.z;
+  float i = I - dt*v.x;
+  float j = J - dt*v.y;
+  float k = K - dt*v.z;
   float4 V = dissipation * tex3d(src, i, j, k, M,M,M);
   dest[I*M*M + J*M + K] = V;
 }
-__global__ void advect(float4* vels, float4* src_vels, float4* dst_vels, float* src_dens, float* dst_dens, float* src_temp, float* dst_temp) {
+__global__ void advect(float4* vels, float4* src_vels, float4* dst_vels, float* src_dens, float* dst_dens, float* src_temp, float* dst_temp, int t) {
   int I = blockIdx.x*blockDim.x + threadIdx.x;
   int J = blockIdx.y*blockDim.y + threadIdx.y;
   int K = blockIdx.z*blockDim.z + threadIdx.z;
@@ -218,10 +218,13 @@ __global__ void advect(float4* vels, float4* src_vels, float4* dst_vels, float* 
   advect(vels, src_temp, dst_temp, 0.99  ,  I, J, K);
   advect(vels, src_dens, dst_dens, 0.9999,  I, J, K);
 
-  if (  (I*2 == M || I*2-1 == M || I*2+1 == M) &&
-        (J*2 == M || J*2-1 == M || J*2+1 == M) &&
+  // Impulse
+  if ( t > 1000 &&
+        (I == M/2 || I == M/2-1 || I == M/2+1) &&
+        (J == M/2 || J == M/2-1 || J == M/2+1) &&
         (  K == 3 ||     K == 4 ||     K == 5)) {
-    dst_temp[I*M*M + J*M + K] += 40.0;
+    dst_temp[I*M*M + J*M + K] += 0.01;
+    //dst_dens[I*M*M + J*M + K] +=  1.0;
   }
 }
 
@@ -233,20 +236,20 @@ __global__ void buoyancy(float4* gvels, float* gtemp, float* gdens, float4* vdes
   float ambient = 0.0;
   float dt = 0.016;
   float sigma = 1.0;
-  float kappa = 0.05;
+  //float kappa = 0.05;
 
   float4 V = gvels[i*M*M + j*M + k];
   float T =  gtemp[i*M*M + j*M + k];
   //float D =  gdens[i*M*M + j*M + k];
-  float D = -tex3d(gdens, i  , j  , k  , M,M,M) +
-             tex3d(gdens, i+1, j  , k  , M,M,M) +
-             tex3d(gdens, i-1, j  , k  , M,M,M) +
-             tex3d(gdens, i  , j+1, k  , M,M,M) +
-             tex3d(gdens, i  , j-1, k  , M,M,M) +
-             tex3d(gdens, i  , j  , k+1, M,M,M) +
-             tex3d(gdens, i  , j  , k-1, M,M,M);
+  //float D = -tex3d(gdens, i  , j  , k  , M,M,M) +
+  //           tex3d(gdens, i+1, j  , k  , M,M,M) +
+  //           tex3d(gdens, i-1, j  , k  , M,M,M) +
+  //           tex3d(gdens, i  , j+1, k  , M,M,M) +
+  //           tex3d(gdens, i  , j-1, k  , M,M,M) +
+  //           tex3d(gdens, i  , j  , k+1, M,M,M) +
+  //           tex3d(gdens, i  , j  , k-1, M,M,M);
              
-  V.z += dt * ((T - ambient) * sigma + D * kappa);
+  V.z += dt * ((T - ambient) * sigma);// - D * kappa);
   vdest[i*M*M + j*M + k] = V;
 }
 
@@ -300,11 +303,11 @@ __global__ void gradient(float4* gvel0, float* gpres, float4* gvel1) {
 
 void step_gpu(float* verts, float* times, float* colors,
               float4* gvel0, float4* gvel1, float* gtemp0, float* gtemp1, float* gdens0, float* gdens1, float* gpres0, float* gpres1, float* diverge,
-              const int N, const int M) {
+              const int N, const int M, int t) {
 
   dim3 gblock(M/8,M/8,M/8);
   dim3 gthread(8,8,8);
-  advect<<<gblock, gthread>>>(gvel0, gvel0, gvel1, gtemp0, gtemp1, gdens0, gdens1);
+  advect<<<gblock, gthread>>>(gvel0, gvel0, gvel1, gdens0, gdens1, gtemp0, gtemp1, t);
   buoyancy<<<gblock, gthread>>>(gvel1, gtemp1, gdens1, gvel0);
   divergence<<<gblock, gthread>>>(gvel0, diverge);
   for (int i=0; i < 10; ++i) {
@@ -367,7 +370,7 @@ bool init(SDL_Window** window, SDL_GLContext* context)
 
 
   //Vsync
-  if (SDL_GL_SetSwapInterval(0) < 0)
+  if (SDL_GL_SetSwapInterval(1) < 0)
   {
     cerr << "SDL could not set Vsync: " << SDL_GetError() << endl;
 //    success = false;
@@ -386,20 +389,20 @@ bool init(SDL_Window** window, SDL_GLContext* context)
 
 ///////////////////////////////////
 
-void display(SDL_Window* window)
+void display(SDL_Window* window, int r)
 {
   //// Step Flame Animation ////
   if (stepmode) {
     if (gpu) {
       if(cudaSuccess != cudaMemcpy(d_gpres[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy: " << endl;
-      if(cudaSuccess != cudaMemcpy(d_gpres[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy: " << endl;
+      //if(cudaSuccess != cudaMemcpy(d_gpres[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy: " << endl;
       if(cudaSuccess != cudaMemcpy(dverts, verts, 3*N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(dtimes, times,   N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(dcolors,colors,3*N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
       step_gpu(dverts, dtimes, dcolors,
                d_gvels[ping], d_gvels[pong], d_gtemp[ping], d_gtemp[pong], d_gdens[ping], d_gdens[pong], d_gpres[0], d_gpres[1], d_diverge,
                //s_gvels[pong], s_gtemp[pong], s_gdens[pong],
-               N, M);
+               N, M, r);
       ping = pong;
       pong = 1-pong;
       if(cudaSuccess != cudaMemcpy(verts, dverts, 3*N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
@@ -494,7 +497,7 @@ void display(SDL_Window* window)
   glDisableClientState(GL_COLOR_ARRAY);
 
   // show velocities for debug purposes
-  cudaError_t err = cudaMemcpy(h_gvels, d_gvels[ping], 4*M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;
+  cudaError_t err = cudaMemcpy(h_gvels, d_gvels[ping], 4*M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) {cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl; quit = true;}
   glUseProgram(0);
   glBegin(GL_LINES);
   for (int i=0; i < M; ++i) {
@@ -511,9 +514,9 @@ void display(SDL_Window* window)
     }
   }
   glEnd();
-
-  // show other values for debug purposes
-  //cudaError_t err = cudaMemcpy(h_gtemp, d_gtemp[ping], M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl;;
+  //
+  //// show other values for debug purposes
+  //cudaError_t err = cudaMemcpy(h_gtemp, d_gtemp[ping], M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) {cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl; quit = true;}
   //glUseProgram(0);
   //glBegin(GL_LINES);
   //for (int i=0; i < M; ++i) {
@@ -521,20 +524,20 @@ void display(SDL_Window* window)
   //    for (int k=0; k < M; ++k) {
   //      glColor3f(1.0,1.0,1.0);
   //      glVertex3f(i, j, k);
-  //      float x = h_gtemp[i*M*M + j*M + k]*1000000.0;
-  //      glColor3f(1.0,1.0,1.0);
-  //      glVertex3f(i+x, j, k);
+  //      float z = h_gtemp[i*M*M + j*M + k]*10.0;
+  //      glColor3f(0.1,0.1,0.1);
+  //      glVertex3f(i, j, k+z);
   //    }
   //  }
   //}
   //glEnd();
-
+  
   //swap the buffers
   glFlush();
   SDL_GL_SwapWindow(window);
 }
 
-void physics()
+void physics(int r)
 {
   const Uint8* state = SDL_GetKeyboardState(NULL);
   keyboard(state);
@@ -545,18 +548,38 @@ void physics()
   zoom = zoom<2.0?2.0:zoom+dzoom;
 
   //// Step Flame Animation ////
-  if (!stepmode) {
+  if (!stepmode && !Pause) {
     if (gpu) {
+      if(cudaSuccess != cudaMemcpy(d_gpres[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy: " << endl;
+      //if(cudaSuccess != cudaMemcpy(d_gpres[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice)) cout << "failure to memcpy: " << endl;
       if(cudaSuccess != cudaMemcpy(dverts, verts, 3*N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(dtimes, times,   N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(dcolors,colors,3*N*sizeof(float), cudaMemcpyHostToDevice)) cout << "memcpy fail\n";
-      step_gpu(dverts, dtimes, dcolors, d_gvels[ping], d_gvels[pong], d_gtemp[ping], d_gtemp[pong], d_gdens[ping], d_gdens[pong], d_gpres[0], d_gpres[1], d_diverge, N, M);
+      step_gpu(dverts, dtimes, dcolors,
+               d_gvels[ping], d_gvels[pong], d_gtemp[ping], d_gtemp[pong], d_gdens[ping], d_gdens[pong], d_gpres[0], d_gpres[1], d_diverge,
+               //s_gvels[pong], s_gtemp[pong], s_gdens[pong],
+               N, M, r);
       ping = pong;
       pong = 1-pong;
       if(cudaSuccess != cudaMemcpy(verts, dverts, 3*N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(times, dtimes,   N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       if(cudaSuccess != cudaMemcpy(colors,dcolors,3*N*sizeof(float), cudaMemcpyDeviceToHost)) cout << "memcpy fail\n";
       //cout << endl;
+      for (int I=0; I < N; ++I) {
+        int i = I*3;
+        if (times[I]   < 0.0 ||
+        verts[i]   < 0.0 ||
+        verts[i]   > M   ||
+        verts[i+1] < 0.0 ||
+        verts[i+1] > M   ||
+        verts[i+2] < 0.0 ||
+        verts[i+1] > M  ) {
+          times[I]   = 1.0f;
+          verts[i  ] = 4*((float)rand()/(float)RAND_MAX-0.5) + M/2;
+          verts[i+1] = 4*((float)rand()/(float)RAND_MAX-0.5) + M/2;
+          verts[i+2] = 4*((float)rand()/(float)RAND_MAX-0.5) + 5.0;
+        }
+      }
     }
     else {
       step_cpu(verts, pvels, times, colors, N);
@@ -822,6 +845,8 @@ int main(int argc, char *argv[])
   err = cudaMemcpy(d_gdens[0], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
   err = cudaMemcpy(d_gdens[1], zeros,   M*M*M*sizeof(float), cudaMemcpyHostToDevice); if (err) cout << "failure to memcpy: " << cudaGetErrorString(err) << endl;
 
+  if (err) quit = true;
+
   //////////////////////////////////////////////////////
 
   starTexture = LoadTexture("star.bmp");
@@ -846,7 +871,7 @@ int main(int argc, char *argv[])
   oldr = startuptime;
 
   ////////Main Loop////////
-  bool quit = false;
+  //bool quit = false;
   while (!quit)
   {
     //cout << "handling events\n";
@@ -855,14 +880,14 @@ int main(int argc, char *argv[])
     ////Physics Timing////
     r = SDL_GetTicks();
     dr += r - oldr;
-    while (dr >= 8)
+    while (dr >= 50)
     {
       // 1000/8 = 125 updates per second
-      physics();
-      dr -= 8;
+      physics(r);
+      dr -= 50;
     }
     oldr = r;
-    display(window);
+    display(window, r);
     frames += 1;
     //quit = true;
   }
