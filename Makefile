@@ -18,12 +18,8 @@ endif
 #endif
 CFLG=-g -O3 -Wall #-std=c++11
 #CFLG=-g -Wall #-std=c++11
-ARCH=-gencode arch=compute_50,code=sm_50 \
-		 -gencode arch=compute_52,code=sm_52 \
-		 -gencode arch=compute_53,code=sm_53 \
-		 -gencode arch=compute_60,code=sm_60 \
-		 -gencode arch=compute_61,code=sm_61 \
-		 -gencode arch=compute_62,code=sm_62 
+ARCH=-gencode arch=compute_75,code=sm_75 \
+		 -gencode arch=compute_86,code=sm_86
 
 all:main
 
@@ -38,11 +34,11 @@ shader.o:shader.cpp shader.h
 #	nvcc -c $< -Xcompiler "$(CFLG) -fopenmp"
 
 main.o:main.cu step.cu shader.h objects.h stdGL.h
-	nvcc $(ARCH) -ccbin g++-4.8 -c -Xcompiler "$(CFLG) $(SFLG) -fPIC -fopenmp" $<
+	nvcc -lineinfo $(ARCH) -ccbin g++ -c -Xcompiler "$(CFLG) $(SFLG) -fPIC -fopenmp" $<
 
 #  link
 main:main.o shader.o objects.o #step.o
-	nvcc $(ARCH) -g -O3 -o $@ $^ -Xlinker "$(GLIBS) -lgomp -fPIC"
+	nvcc -lineinfo $(ARCH) -g -O3 -o $@ $^ -Xlinker "$(GLIBS) -lgomp -fPIC"
 
 
 #  Clean
