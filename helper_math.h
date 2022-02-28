@@ -24,6 +24,7 @@
 #define HELPER_MATH_H
 
 #include "cuda_runtime.h"
+#include <cooperative_groups.h>
 
 typedef unsigned int uint;
 typedef unsigned short ushort;
@@ -1140,6 +1141,34 @@ inline __device__ __host__ float4 lerp(float4 a, float4 b, float t)
     return a + t*(b-a);
 }
 
+inline __device__ __host__ float dilerp(float a, float b, float c, float d, float x, float y)
+{
+    float ab = lerp(a, b, x);
+    float cd = lerp(c, d, x);
+    return     lerp(ab, cd, y);
+}
+
+inline __device__ __host__ float2 dilerp(float2 a, float2 b, float2 c, float2 d, float x, float y)
+{
+    float2 ab = lerp(a, b, x);
+    float2 cd = lerp(c, d, x);
+    return     lerp(ab, cd, y);
+}
+
+inline __device__ __host__ float3 dilerp(float3 a, float3 b, float3 c, float3 d, float x, float y)
+{
+    float3 ab = lerp(a, b, x);
+    float3 cd = lerp(c, d, x);
+    return     lerp(ab, cd, y);
+}
+
+inline __device__ __host__ float4 dilerp(float4 a, float4 b, float4 c, float4 d, float x, float y)
+{
+    float4 ab = lerp(a, b, x);
+    float4 cd = lerp(c, d, x);
+    return     lerp(ab, cd, y);
+}
+
 inline __device__ __host__ float trilerp(float a, float b, float c, float d, float e, float f, float g, float h, float x, float y, float z)
 {
     float ab = lerp(a, b, x);
@@ -1149,6 +1178,28 @@ inline __device__ __host__ float trilerp(float a, float b, float c, float d, flo
     float ac = lerp(ab, cd, y);
     float eg = lerp(ef, gh, y);
     return     lerp(ac, eg, z);
+}
+
+inline __device__ __host__ float2 trilerp(float2 a, float2 b, float2 c, float2 d, float2 e, float2 f, float2 g, float2 h, float x, float y, float z)
+{
+    float2 ab = lerp(a, b, x);
+    float2 cd = lerp(c, d, x);
+    float2 ef = lerp(e, f, x);
+    float2 gh = lerp(g, h, x);
+    float2 ac = lerp(ab, cd, y);
+    float2 eg = lerp(ef, gh, y);
+    return      lerp(ac, eg, z);
+}
+
+inline __device__ __host__ float3 trilerp(float3 a, float3 b, float3 c, float3 d, float3 e, float3 f, float3 g, float3 h, float x, float y, float z)
+{
+    float3 ab = lerp(a, b, x);
+    float3 cd = lerp(c, d, x);
+    float3 ef = lerp(e, f, x);
+    float3 gh = lerp(g, h, x);
+    float3 ac = lerp(ab, cd, y);
+    float3 eg = lerp(ef, gh, y);
+    return      lerp(ac, eg, z);
 }
 
 inline __device__ __host__ float4 trilerp(float4 a, float4 b, float4 c, float4 d, float4 e, float4 f, float4 g, float4 h, float x, float y, float z)
