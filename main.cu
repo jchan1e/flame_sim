@@ -568,15 +568,15 @@ void display(SDL_Window* window, int r)
   for (int i=0; i < M; ++i) {
     for (int j=0; j < M; ++j) {
       for (int k=0; k < M; ++k) {
-        glColor3f(1.0,0.0,0.0);
+        glColor3f(1.0,0.5,0.0);
         glVertex3f(i, j, k);
-        float x = h_gvels[4*(i*M*M + j*M + k)  ]*10.0;
-        float y = h_gvels[4*(i*M*M + j*M + k)+1]*10.0;
-        float z = h_gvels[4*(i*M*M + j*M + k)+2]*10.0;
+        float x = h_gvels[4*(i*M*M + j*M + k)  ]*5.0;
+        float y = h_gvels[4*(i*M*M + j*M + k)+1]*5.0;
+        float z = h_gvels[4*(i*M*M + j*M + k)+2]*5.0;
         //float x = 0.0;
         //float y = 0.0;
         //float z = h_gvels[4*(i*M*M + j*M + k)+3]*10.0;
-        glColor3f(0.0,0.0,0.0);
+        glColor3f(0.5,0.0,0.0);
         glVertex3f(i+x, j+y, k+z);
       }
     }
