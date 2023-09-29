@@ -25,6 +25,8 @@
 
 #include "cuda_runtime.h"
 #include <cooperative_groups.h>
+#include <curand.h>
+#include <curand_kernel.h>
 
 typedef unsigned int uint;
 typedef unsigned short ushort;
