@@ -394,7 +394,7 @@ __global__ void advect(float4* vels_out, float4* vels_in) {
 
   vels_out[i*M*M + j*M + k] = tex3d(vels_in, fi, fj, fk, M,M,M);
 
-  if (i/2 == M/5 && j/2 == M/5 && k/2 == M/5) {
+  if (i/2 == M/4 && j/2 == M/4 && k/2 == M/4) {
     vels_out[i*M*M + j*M + k].z = 1.0;
   }
 
@@ -435,9 +435,9 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     curandState_t localstate0 = curandstate[I+0];
     curandState_t localstate1 = curandstate[I+1];
     curandState_t localstate2 = curandstate[I+2];
-    verts[i  ] = (curand_normal(&localstate0)) + M*2/5;
-    verts[i+1] = (curand_normal(&localstate1)) + M*2/5;
-    verts[i+2] = (curand_normal(&localstate2)) + M*2/5;
+    verts[i  ] = (curand_normal(&localstate0)) + M/2;
+    verts[i+1] = (curand_normal(&localstate1)) + M/2;
+    verts[i+2] = (curand_normal(&localstate2)) + M/2;
     curandstate[I+0] = localstate0;
     curandstate[I+1] = localstate1;
     curandstate[I+2] = localstate2;
@@ -451,8 +451,8 @@ void step_gpu(float* verts, float* times, float* colors,
   dim3 gBlock(M/b,M/b,M/b);
   dim3 gThread(b,b,b);
 
-  float visc = 1.0;
-  // Diffuse Velocities
+  float visc = 0.1;
+  // diffuse velocities
   diffuse<<<gBlock,gThread>>>(gvel1, gvel0, visc);
   //void** diffuse_args[3];
   //diffuse_args[0] = (void**)&gvel1; diffuse_args[1] = (void**)&gvel0; diffuse_args[2] = (void**)&visc;
@@ -606,6 +606,26 @@ void display(SDL_Window* window, int r)
   glDisable(GL_BLEND);
   glDisableClientState(GL_VERTEX_ARRAY);
   glDisableClientState(GL_COLOR_ARRAY);
+
+  // Bounding Box
+  glUseProgram(0);
+  glEnable(GL_DEPTH_TEST);
+  glBegin(GL_LINES);
+  glColor3f(1.0,1.0,1.0);
+  glVertex3f(0,0,0); glVertex3f(0,0,M);
+  glVertex3f(0,0,M); glVertex3f(0,M,M);
+  glVertex3f(0,M,M); glVertex3f(0,M,0);
+  glVertex3f(0,M,0); glVertex3f(0,0,0);
+  glVertex3f(0,0,0); glVertex3f(M,0,0);
+  glVertex3f(0,0,M); glVertex3f(M,0,M);
+  glVertex3f(0,M,M); glVertex3f(M,M,M);
+  glVertex3f(0,M,0); glVertex3f(M,M,0);
+  glVertex3f(M,0,0); glVertex3f(M,0,M);
+  glVertex3f(M,0,M); glVertex3f(M,M,M);
+  glVertex3f(M,M,M); glVertex3f(M,M,0);
+  glVertex3f(M,M,0); glVertex3f(M,0,0);
+  glEnd();
+  glDisable(GL_DEPTH_TEST);
 
 
   //// DEBUG ////
