@@ -33,11 +33,11 @@ shader.o:shader.cpp shader.h
 #step.o:step.cu step.h
 #	nvcc -c $< -Xcompiler "$(CFLG) -fopenmp"
 
-main.o:main.cu step.cu shader.h objects.h stdGL.h
+main.o:main.cu shader.h objects.h stdGL.h
 	nvcc -lineinfo $(ARCH) -ccbin g++ -c -Xcompiler "$(CFLG) $(SFLG) -fPIC -fopenmp" $<
 
 #  link
-main:main.o shader.o objects.o #step.o
+main:main.o shader.o objects.o
 	nvcc -lineinfo $(ARCH) -g -O3 -o $@ $^ -Xlinker "$(GLIBS) -lgomp -fPIC"
 
 

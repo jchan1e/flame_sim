@@ -41,7 +41,7 @@ int pixlight = 0;
 //int test = 0;
 
 //Simulation Timestep
-const float dt = 1.0/64.0;
+const float dt = 1.0/128.0;
 //const float dt = 0.125;
 bool changed = false;
 
@@ -79,7 +79,10 @@ float4* d_gvels[2] = {NULL};
 //float*  d_gpres[2] = {NULL};
 //float*  d_diverge  =  NULL;
 
-//User-controlled Computation Modes
+//User Interaction
+bool rotating = false;
+bool flame_moving = false;
+bool fieldlines = false;
 bool stepmode = false;
 bool gpu = true;
 
@@ -630,32 +633,34 @@ void display(SDL_Window* window, int r)
 
   //// DEBUG ////
 
-//  // show velocities for debug purposes
-//  if (changed) {
-//    cudaError_t err = cudaMemcpyAsync(h_gvels, d_gvels[ping], 4*M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) {cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl; quit = true;}
-//  }
-//  //cout << "Successfully copied Velocities from Device to Host\n";
-//  glUseProgram(0);
-//  glEnable(GL_DEPTH_TEST);
-//  glBegin(GL_LINES);
-//  for (int i=0; i < M; ++i) {
-//    for (int j=0; j < M; ++j) {
-//      for (int k=0; k < M; ++k) {
-//        glColor3f(1.0,0.5,0.0);
-//        glVertex3f(i, j, k);
-//        float x = h_gvels[4*(i*M*M + j*M + k)  ]*5.0;
-//        float y = h_gvels[4*(i*M*M + j*M + k)+1]*5.0;
-//        float z = h_gvels[4*(i*M*M + j*M + k)+2]*5.0;
-//        //float x = 0.0;
-//        //float y = 0.0;
-//        //float z = h_gvels[4*(i*M*M + j*M + k)+3]*10.0;
-//        glColor3f(0.5,0.0,0.0);
-//        glVertex3f(i+x, j+y, k+z);
-//      }
-//    }
-//  }
-//  glEnd();
-//  glDisable(GL_DEPTH_TEST);
+  if (fieldlines) {
+    // show velocities for debug purposes
+    if (changed) {
+      cudaError_t err = cudaMemcpyAsync(h_gvels, d_gvels[ping], 4*M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) {cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl; quit = true;}
+    }
+    //cout << "Successfully copied Velocities from Device to Host\n";
+    glUseProgram(0);
+    glEnable(GL_DEPTH_TEST);
+    glBegin(GL_LINES);
+    for (int i=0; i < M; ++i) {
+      for (int j=0; j < M; ++j) {
+        for (int k=0; k < M; ++k) {
+          glColor3f(1.0,0.5,0.0);
+          glVertex3f(i, j, k);
+          float x = h_gvels[4*(i*M*M + j*M + k)  ]*5.0;
+          float y = h_gvels[4*(i*M*M + j*M + k)+1]*5.0;
+          float z = h_gvels[4*(i*M*M + j*M + k)+2]*5.0;
+          //float x = 0.0;
+          //float y = 0.0;
+          //float z = h_gvels[4*(i*M*M + j*M + k)+3]*10.0;
+          glColor3f(0.5,0.0,0.0);
+          glVertex3f(i+x, j+y, k+z);
+        }
+      }
+    }
+    glEnd();
+    glDisable(GL_DEPTH_TEST);
+  }
 
   //// show other values for debug purposes
   //cudaError_t err = cudaMemcpy(h_gtemp, d_gtemp[ping], M*M*M*sizeof(float), cudaMemcpyDeviceToHost); if (err != cudaSuccess) {cout << "cudaMemcpy failed: " << cudaGetErrorString(err) << endl; quit = true;}
@@ -903,6 +908,27 @@ bool handleEvents()
       case SDL_QUIT:
         return true;
 
+      case SDL_MOUSEMOTION:
+        break;
+
+      case SDL_MOUSEWHEEL:
+        break;
+
+      case SDL_MOUSEBUTTONDOWN:
+        switch (event.button)
+        {
+          case SDL_BUTTON_LEFT:
+            flame_moving = true;
+            break;
+
+          case SDL_BUTTON_RIGHT:
+            rotating = true;
+            break;
+        }
+
+      case SDL_MOUSEBUTTONUP:
+        break;
+
       case SDL_KEYDOWN:
         switch (event.key.keysym.scancode)
         {
@@ -919,7 +945,10 @@ bool handleEvents()
 
           case SDL_SCANCODE_G:
             gpu = !gpu;
+            break;
 
+          case SDL_SCANCODE_V:
+            fieldlines = !fieldlines;
             break;
 
           default:
