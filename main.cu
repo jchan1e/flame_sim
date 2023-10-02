@@ -24,7 +24,7 @@ int h = 1080;
 double ex = 0;
 double ey = 0;
 double ez = 0;
-double zoom = 48;
+double zoom = 64;
 double dzoom = 0;
 double th = 0;
 double ph = 0;
@@ -41,7 +41,7 @@ int pixlight = 0;
 //int test = 0;
 
 //Simulation Timestep
-const float dt = 1.0/128.0;
+const float dt = 1.0/64.0;
 //const float dt = 0.125;
 bool changed = false;
 
@@ -49,7 +49,8 @@ bool changed = false;
 curandState_t* curandstate;
 
 // Array Sizes
-const int N = pow(2,20);
+//const int N = pow(2,20);
+const int N = 1024*64;
 const int M = 64;
 int ping = 0;
 int pong = 1;
@@ -85,6 +86,10 @@ bool flame_moving = false;
 bool fieldlines = false;
 bool stepmode = false;
 bool gpu = true;
+float flame_x = M/2.0;
+float flame_y = M/2.0;
+float tick_period = 4.0;
+//float flame_z = 0.0;
 
 ////////////////////
 //functions that are called ahead of when they're defined
@@ -130,12 +135,12 @@ __device__ float4 tex3d(float4* tex, float i, float j, float k, int s_i, int s_j
   //  return 0.0;
 
   float4 a = tex[i1*s_j*s_k + j1*s_k + k1];
-  float4 b = tex[i1*s_j*s_k + j1*s_k + k2];
+  float4 b = tex[i2*s_j*s_k + j1*s_k + k1];
   float4 c = tex[i1*s_j*s_k + j2*s_k + k1];
-  float4 d = tex[i1*s_j*s_k + j2*s_k + k2];
-  float4 e = tex[i2*s_j*s_k + j1*s_k + k1];
+  float4 d = tex[i2*s_j*s_k + j2*s_k + k1];
+  float4 e = tex[i1*s_j*s_k + j1*s_k + k2];
   float4 f = tex[i2*s_j*s_k + j1*s_k + k2];
-  float4 g = tex[i2*s_j*s_k + j2*s_k + k1];
+  float4 g = tex[i1*s_j*s_k + j2*s_k + k2];
   float4 h = tex[i2*s_j*s_k + j2*s_k + k2];
   return trilerp(a,b,c,d,e,f,g,h, i-i1,j-j1,k-k1);
 }
@@ -160,12 +165,12 @@ __device__ float tex3d(float* tex, float i, float j, float k, int s_i, int s_j, 
   //  return 0.0;
 
   float a = tex[i1*s_j*s_k + j1*s_k + k1];
-  float b = tex[i1*s_j*s_k + j1*s_k + k2];
+  float b = tex[i2*s_j*s_k + j1*s_k + k1];
   float c = tex[i1*s_j*s_k + j2*s_k + k1];
-  float d = tex[i1*s_j*s_k + j2*s_k + k2];
-  float e = tex[i2*s_j*s_k + j1*s_k + k1];
+  float d = tex[i2*s_j*s_k + j2*s_k + k1];
+  float e = tex[i1*s_j*s_k + j1*s_k + k2];
   float f = tex[i2*s_j*s_k + j1*s_k + k2];
-  float g = tex[i2*s_j*s_k + j2*s_k + k1];
+  float g = tex[i1*s_j*s_k + j2*s_k + k2];
   float h = tex[i2*s_j*s_k + j2*s_k + k2];
   return trilerp(a,b,c,d,e,f,g,h, i-i1,j-j1,k-k1);
 }
@@ -175,6 +180,10 @@ __device__ void set_bnd(float4* vels) {
   int j = blockIdx.y*blockDim.y + threadIdx.y;
   int k = blockIdx.z*blockDim.z + threadIdx.z;
 
+  // Boundary conditions:
+  // X: reflect
+  // Y: reflect
+  // Z: reflect
   if (i == 0) {
     float4 src = vels[(i+1)*M*M + j*M + k];
     vels[i*M*M + j*M + k] = make_float4(-src.x, src.y, src.z, src.w);
@@ -247,7 +256,7 @@ __global__ void diffuse(float4* x, float4* x0, float viscosity) {
           a*(x0[(i+1)*M*M + j*M + k] + x0[(i-1)*M*M + j*M + k]
            + x0[i*M*M + (j+1)*M + k] + x0[i*M*M + (j-1)*M + k]
            + x0[i*M*M + j*M + (k+1)] + x0[i*M*M + j*M + (k-1)])
-        )*cc;
+      )*cc;
   }
   set_bnd(x);
 }
@@ -275,9 +284,9 @@ __global__ void pressure(float4* vels, float4* vels0) {
     float v_z0 = vels0[i*M*M + j*M + (k-1)].z;
     float v_z1 = vels0[i*M*M + j*M + (k+1)].z;
     // apply net pressure force
-    float d_x = p_x0 - p_x1;
-    float d_y = p_y0 - p_y1;
-    float d_z = p_z0 - p_z1;
+    float d_x = 5.0*(p_x0 - p_x1);
+    float d_y = 5.0*(p_y0 - p_y1);
+    float d_z = 5.0*(p_z0 - p_z1);
     // and add vertical buoyancy force
     //float p_b = vels0[i*M*M + j*M + k].w - 0.16666*(p_x0 + p_x1 + p_y0 + p_y1 + p_z0 + p_z1);
     //float p_b = 0.0;
@@ -287,13 +296,15 @@ __global__ void pressure(float4* vels, float4* vels0) {
     //float a = 5.0;
 
     // modify pressure based on net velocity
-    float d_p = 5.0 * (v_x0 - v_x1
+    float d_p = 1.0 * (v_x0 - v_x1
                      + v_y0 - v_y1
                      + v_z0 - v_z1);
 
     vels[i*M*M + j*M + k].x = vels0[i*M*M + j*M + k].x + dt*d_x;
     vels[i*M*M + j*M + k].y = vels0[i*M*M + j*M + k].y + dt*d_y;
     vels[i*M*M + j*M + k].z = vels0[i*M*M + j*M + k].z + dt*d_z;
+    // small velocity decay to naturally trend back toward zero instead of infinity over time
+    vels[i*M*M + j*M + k] *= 0.999;
     vels[i*M*M + j*M + k].w = d_p;
   }
 
@@ -345,8 +356,7 @@ __global__ void project(float4* vels) {
   float dz0 = 0.0;
   if (i > 0 && i < M-1 && j > 0 && j < M-1 && k > 1) {
     dz0 = 0.16666*( - vels[(i-1)*M*M + j*M + (k-1)].x
-                    + vels[(i+1)*M*M + j*M + (k-1)].x
-                    - vels[i*M*M + (j-1)*M + (k-1)].y
+                    + vels[(i+1)*M*M + j*M + (k-1)].x - vels[i*M*M + (j-1)*M + (k-1)].y
                     + vels[i*M*M + (j+1)*M + (k-1)].y
                     - vels[i*M*M + j*M + (k-2)].z
                     + vels[i*M*M + j*M + k].z);
@@ -386,7 +396,7 @@ __global__ void balance(float4* vels) {//, float4* vels0) {
   set_bnd(vels);
 }
 
-__global__ void advect(float4* vels_out, float4* vels_in) {
+__global__ void advect(float4* vels_out, float4* vels_in, float flame_x, float flame_y, float* verts, float* times) {
   int i = blockIdx.x*blockDim.x + threadIdx.x;
   int j = blockIdx.y*blockDim.y + threadIdx.y;
   int k = blockIdx.z*blockDim.z + threadIdx.z;
@@ -397,9 +407,25 @@ __global__ void advect(float4* vels_out, float4* vels_in) {
 
   vels_out[i*M*M + j*M + k] = tex3d(vels_in, fi, fj, fk, M,M,M);
 
-  if (i/2 == M/4 && j/2 == M/4 && k/2 == M/4) {
-    vels_out[i*M*M + j*M + k].z = 1.0;
-  }
+  //// Add impulse based on heat buoyancy from the particles
+  //float impulse = 0.0;
+  //for (int n=0; n<N; ++n) {
+  //  float3 vert = make_float3(verts[n*3], verts[n*3+1], verts[n*3+2]);
+  //  float dx = vert.x-i;
+  //  float dy = vert.y-j;
+  //  float dz = vert.z-k;
+  //  if (abs(dx) < 1.0 && abs(dy) < 1.0 && abs(dz) < 1.0) {
+  //    float dist = sqrt(dx*dx + dy*dy + dz*dz);
+  //    impulse += (1.0-dist) * times[n];
+  //  }
+  //}
+  //vels_out[i*M*M + j*M + k].z += 4.0*impulse/N;
+
+  //if (abs(i - flame_x) <= 1.0 && abs(j - flame_y) <= 1.0 && k/2 == M/8) {
+  //  vels_out[i*M*M + j*M + k].x = 0.0;
+  //  vels_out[i*M*M + j*M + k].y = 0.0;
+  //  vels_out[i*M*M + j*M + k].z = 0.5;
+  //}
 
   set_bnd(vels_out);
 }
@@ -415,7 +441,7 @@ __global__ void init_rand_state(curandState_t* curandstate) {
   curand_init(1729, I, 0, &curandstate[I]);
 }
 
-__global__ void pstep(float4* gvels, float* verts, float* times, float* colors, curandState_t* curandstate) {
+__global__ void pstep(float4* gvels, float* verts, float* times, float* colors, curandState_t* curandstate, float flame_x, float flame_y) {
   // times index
   int I = blockIdx.x*blockDim.x + threadIdx.x;
   // verts & colors index
@@ -432,29 +458,112 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
   //colors[i  ] = max(0.2, abs(V.x));
   //colors[i+1] = max(0.2, abs(V.y));
   //colors[i+2] = max(0.2, abs(V.z));
-  times[I] -= 0.001f;
+  times[I] -= 0.008f;
   if (times[I] < 0.0f) {
     times[I]   = 1.0f;
     curandState_t localstate0 = curandstate[I+0];
     curandState_t localstate1 = curandstate[I+1];
     curandState_t localstate2 = curandstate[I+2];
-    verts[i  ] = (curand_normal(&localstate0)) + M/2;
-    verts[i+1] = (curand_normal(&localstate1)) + M/2;
-    verts[i+2] = (curand_normal(&localstate2)) + M/2;
+    verts[i  ] = (curand_normal(&localstate0)) + flame_x;
+    verts[i+1] = (curand_normal(&localstate1)) + flame_y;
+    verts[i+2] = (curand_normal(&localstate2)) + M/4;
     curandstate[I+0] = localstate0;
     curandstate[I+1] = localstate1;
     curandstate[I+2] = localstate2;
+  }
+
+  // Add impulse to gvels based on particle temperature
+  //    float dist = sqrt(dx*dx + dy*dy + dz*dz);
+  //    impulse += (1.0-dist) * times[n];
+  //  }
+  //}
+  //vels_out[i*M*M + j*M + k].z += 4.0*impulse/N;
+  //vels_out[i*M*M + j*M + k].w += 1.0*impulse/N;
+  float3 pos = make_float3(verts[i], verts[i+1], verts[i+2]);
+  if (pos.x > 0 && pos.x < M-1 &&
+      pos.y > 0 && pos.y < M-1 &&
+      pos.z > 0 && pos.z < M-1) {
+    // for each of 8 nearest grid cells
+    int i0,j0,k0,i1,j1,k1;
+    float share;
+    float d_buoy = 1024.0;
+    float d_pres = 8192.0;
+    // 0,0,0
+    i0 = floor(pos.x); i1 = ceil(pos.x);
+    j0 = floor(pos.y); j1 = ceil(pos.y);
+    k0 = floor(pos.z); k1 = ceil(pos.z);
+    // proportion given to each cell is equal to volume of the opposite quadrant
+    share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
+    // 0,0,1
+    i0 = floor(pos.x); i1 = ceil(pos.x);
+    j0 = floor(pos.y); j1 = ceil(pos.y);
+    k1 = floor(pos.z); k0 = ceil(pos.z);
+    // proportion given to each cell is equal to volume of the opposite quadrant
+    share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
+    // 0,1,0
+    i0 = floor(pos.x); i1 = ceil(pos.x);
+    j1 = floor(pos.y); j0 = ceil(pos.y);
+    k0 = floor(pos.z); k1 = ceil(pos.z);
+    // proportion given to each cell is equal to volume of the opposite quadrant
+    share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
+    // 0,1,1
+    i0 = floor(pos.x); i1 = ceil(pos.x);
+    j1 = floor(pos.y); j0 = ceil(pos.y);
+    k1 = floor(pos.z); k0 = ceil(pos.z);
+    // proportion given to each cell is equal to volume of the opposite quadrant
+    share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
+    // 1,0,0
+    i1 = floor(pos.x); i0 = ceil(pos.x);
+    j0 = floor(pos.y); j1 = ceil(pos.y);
+    k0 = floor(pos.z); k1 = ceil(pos.z);
+    // proportion given to each cell is equal to volume of the opposite quadrant
+    share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
+    // 1,0,1
+    i1 = floor(pos.x); i0 = ceil(pos.x);
+    j0 = floor(pos.y); j1 = ceil(pos.y);
+    k1 = floor(pos.z); k0 = ceil(pos.z);
+    // proportion given to each cell is equal to volume of the opposite quadrant
+    share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
+    // 1,1,0
+    i1 = floor(pos.x); i0 = ceil(pos.x);
+    j1 = floor(pos.y); j0 = ceil(pos.y);
+    k0 = floor(pos.z); k1 = ceil(pos.z);
+    // proportion given to each cell is equal to volume of the opposite quadrant
+    share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
+    // 1,1,1
+    i1 = floor(pos.x); i0 = ceil(pos.x);
+    j1 = floor(pos.y); j0 = ceil(pos.y);
+    k1 = floor(pos.z); k0 = ceil(pos.z);
+    // proportion given to each cell is equal to volume of the opposite quadrant
+    share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
   }
 }
 
 void step_gpu(float* verts, float* times, float* colors,
               float4* gvel0, float4* gvel1, //float* gpres0, float* gpres1,
-              const int N, const int M, int t) {
+              const int N, const int M, int t,
+              float flame_x, float flame_y) {
   int b = 8;
   dim3 gBlock(M/b,M/b,M/b);
   dim3 gThread(b,b,b);
 
-  float visc = 0.1;
+  float visc = 0.10;
   // diffuse velocities
   diffuse<<<gBlock,gThread>>>(gvel1, gvel0, visc);
   //void** diffuse_args[3];
@@ -467,12 +576,11 @@ void step_gpu(float* verts, float* times, float* colors,
   // Balance pressure
   //balance<<<gBlock,gThread>>>(gvel1);//, gvel1);
   // Advect Velocities
-  advect<<<gBlock,gThread>>>(gvel1, gvel0);
+  advect<<<gBlock,gThread>>>(gvel1, gvel0, flame_x, flame_y, verts, times);
   // Ping the Pong
-  //int Mblocks = ceil(M*M*M/512.0);
   //pingpong<<<Mblocks,512>>>(gvel1, gvel0);
   // Move Particles
-  pstep<<<N/512,512>>>(gvel1, verts, times, colors, curandstate);
+  pstep<<<N/512,512>>>(gvel1, verts, times, colors, curandstate, flame_x, flame_y);
 }
 
 void step_cpu(float* verts, float* vels, float* times, float* colors, int N) {
@@ -739,7 +847,7 @@ void physics(int r)
       step_gpu(dverts, dtimes, dcolors,
                d_gvels[ping], d_gvels[pong],// d_gtemp[ping], d_gtemp[pong], d_gdens[ping], d_gdens[pong], d_gpres[0], d_gpres[1], d_diverge,
                //s_gvels[pong], s_gtemp[pong], s_gdens[pong],
-               N, M, r);
+               N, M, r, flame_x, flame_y);
       ping = pong;
       pong = 1-pong;
     }
@@ -767,7 +875,7 @@ void reshape(int width, int height)
 
   //adjust projection
   //glOrtho(-w2h, w2h, -1, 1, -1, 1);
-  gluPerspective(60, w2h, 1.0, 2*M);
+  gluPerspective(60, w2h, 1.0, 4*M);
 
   //switch back to model matrix
   glMatrixMode(GL_MODELVIEW);
@@ -909,13 +1017,30 @@ bool handleEvents()
         return true;
 
       case SDL_MOUSEMOTION:
+        if (flame_moving)
+        {
+          float dx_f = ( Cos(th)*event.motion.xrel + Sin(th)*event.motion.yrel) / M * 2.0;
+          float dy_f = (-Sin(th)*event.motion.xrel + Cos(th)*event.motion.yrel) / M * 2.0;
+          flame_x = min(max(flame_x - dx_f, 1.0), M-2.0);
+          flame_y = min(max(flame_y + dy_f, 1.0), M-2.0);
+          //cout << flame_x << "\t" << flame_y << endl;
+        }
+        if (rotating)
+        {
+          th -= event.motion.xrel/(2.0*M_PI);
+          ph += event.motion.yrel/(2.0*M_PI);
+        }
         break;
 
       case SDL_MOUSEWHEEL:
+        if (event.wheel.y > 0)
+          zoom /= pow(2.0, 1.0/8.0);
+        else if (event.wheel.y < 0)
+          zoom *= pow(2.0, 1.0/8.0);
         break;
 
       case SDL_MOUSEBUTTONDOWN:
-        switch (event.button)
+        switch (event.button.button)
         {
           case SDL_BUTTON_LEFT:
             flame_moving = true;
@@ -925,8 +1050,19 @@ bool handleEvents()
             rotating = true;
             break;
         }
+        break;
 
       case SDL_MOUSEBUTTONUP:
+        switch (event.button.button)
+        {
+          case SDL_BUTTON_LEFT:
+            flame_moving = false;
+            break;
+
+          case SDL_BUTTON_RIGHT:
+            rotating = false;
+            break;
+        }
         break;
 
       case SDL_KEYDOWN:
@@ -949,6 +1085,14 @@ bool handleEvents()
 
           case SDL_SCANCODE_V:
             fieldlines = !fieldlines;
+            break;
+
+          case SDL_SCANCODE_COMMA:
+            tick_period /= pow(2,0.25);
+            break;
+
+          case SDL_SCANCODE_PERIOD:
+            tick_period *= pow(2,0.25);
             break;
 
           default:
@@ -1050,9 +1194,9 @@ int main(int argc, char *argv[])
   glTexEnvi(GL_TEXTURE_2D, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 
   //Timing
-  int r = 0;
-  int dr = 0;
-  int oldr = 0;
+  float r = 0;
+  float dr = 0;
+  float oldr = 0;
   //int Pause = 0;
   int frames = 0;
 
@@ -1076,11 +1220,11 @@ int main(int argc, char *argv[])
       ////Physics Timing////
       r = SDL_GetTicks();
       dr += r - oldr;
-      while (dr >= 16)
+      while (dr >= tick_period)
       {
         // 1000/8 = 125 updates per second
         physics(r);
-        dr -= 16;
+        dr -= tick_period;
       }
       oldr = r;
       display(window, r);
