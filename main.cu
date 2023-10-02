@@ -89,6 +89,7 @@ bool gpu = true;
 float flame_x = M/2.0;
 float flame_y = M/2.0;
 float tick_period = 4.0;
+float decay_rate = 0.008;
 //float flame_z = 0.0;
 
 ////////////////////
@@ -396,7 +397,7 @@ __global__ void balance(float4* vels) {//, float4* vels0) {
   set_bnd(vels);
 }
 
-__global__ void advect(float4* vels_out, float4* vels_in, float flame_x, float flame_y, float* verts, float* times) {
+__global__ void advect(float4* vels_out, float4* vels_in, float* verts, float* times) {
   int i = blockIdx.x*blockDim.x + threadIdx.x;
   int j = blockIdx.y*blockDim.y + threadIdx.y;
   int k = blockIdx.z*blockDim.z + threadIdx.z;
@@ -441,7 +442,7 @@ __global__ void init_rand_state(curandState_t* curandstate) {
   curand_init(1729, I, 0, &curandstate[I]);
 }
 
-__global__ void pstep(float4* gvels, float* verts, float* times, float* colors, curandState_t* curandstate, float flame_x, float flame_y) {
+__global__ void pstep(float4* gvels, float* verts, float* times, float* colors, curandState_t* curandstate, float flame_x, float flame_y, float decay_rate) {
   // times index
   int I = blockIdx.x*blockDim.x + threadIdx.x;
   // verts & colors index
@@ -458,9 +459,9 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
   //colors[i  ] = max(0.2, abs(V.x));
   //colors[i+1] = max(0.2, abs(V.y));
   //colors[i+2] = max(0.2, abs(V.z));
-  times[I] -= 0.008f;
+  times[I] -= decay_rate;
   if (times[I] < 0.0f) {
-    times[I]   = 1.0f;
+    times[I]  += 1.0f;
     curandState_t localstate0 = curandstate[I+0];
     curandState_t localstate1 = curandstate[I+1];
     curandState_t localstate2 = curandstate[I+2];
@@ -494,7 +495,7 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     k0 = floor(pos.z); k1 = ceil(pos.z);
     // proportion given to each cell is equal to volume of the opposite quadrant
     share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
-    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.0)*share/N;
     gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
     // 0,0,1
     i0 = floor(pos.x); i1 = ceil(pos.x);
@@ -502,7 +503,7 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     k1 = floor(pos.z); k0 = ceil(pos.z);
     // proportion given to each cell is equal to volume of the opposite quadrant
     share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
-    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.0)*share/N;
     gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
     // 0,1,0
     i0 = floor(pos.x); i1 = ceil(pos.x);
@@ -510,7 +511,7 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     k0 = floor(pos.z); k1 = ceil(pos.z);
     // proportion given to each cell is equal to volume of the opposite quadrant
     share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
-    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.0)*share/N;
     gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
     // 0,1,1
     i0 = floor(pos.x); i1 = ceil(pos.x);
@@ -518,7 +519,7 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     k1 = floor(pos.z); k0 = ceil(pos.z);
     // proportion given to each cell is equal to volume of the opposite quadrant
     share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
-    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.0)*share/N;
     gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
     // 1,0,0
     i1 = floor(pos.x); i0 = ceil(pos.x);
@@ -526,7 +527,7 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     k0 = floor(pos.z); k1 = ceil(pos.z);
     // proportion given to each cell is equal to volume of the opposite quadrant
     share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
-    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.0)*share/N;
     gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
     // 1,0,1
     i1 = floor(pos.x); i0 = ceil(pos.x);
@@ -534,7 +535,7 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     k1 = floor(pos.z); k0 = ceil(pos.z);
     // proportion given to each cell is equal to volume of the opposite quadrant
     share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
-    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.0)*share/N;
     gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
     // 1,1,0
     i1 = floor(pos.x); i0 = ceil(pos.x);
@@ -542,7 +543,7 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     k0 = floor(pos.z); k1 = ceil(pos.z);
     // proportion given to each cell is equal to volume of the opposite quadrant
     share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
-    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.0)*share/N;
     gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
     // 1,1,1
     i1 = floor(pos.x); i0 = ceil(pos.x);
@@ -550,7 +551,7 @@ __global__ void pstep(float4* gvels, float* verts, float* times, float* colors, 
     k1 = floor(pos.z); k0 = ceil(pos.z);
     // proportion given to each cell is equal to volume of the opposite quadrant
     share = abs((i1-pos.x) * (j1-pos.y) * (k1-pos.z));
-    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.2)*share/N;
+    gvels[i0*M*M + j0*M + k0].z += d_buoy*dt*(times[i]-0.0)*share/N;
     gvels[i0*M*M + j0*M + k0].w += d_pres*dt*(times[i]-0.2)*share/N;
   }
 }
@@ -576,11 +577,11 @@ void step_gpu(float* verts, float* times, float* colors,
   // Balance pressure
   //balance<<<gBlock,gThread>>>(gvel1);//, gvel1);
   // Advect Velocities
-  advect<<<gBlock,gThread>>>(gvel1, gvel0, flame_x, flame_y, verts, times);
+  advect<<<gBlock,gThread>>>(gvel1, gvel0, verts, times);
   // Ping the Pong
   //pingpong<<<Mblocks,512>>>(gvel1, gvel0);
   // Move Particles
-  pstep<<<N/512,512>>>(gvel1, verts, times, colors, curandstate, flame_x, flame_y);
+  pstep<<<N/512,512>>>(gvel1, verts, times, colors, curandstate, flame_x, flame_y, decay_rate);
 }
 
 void step_cpu(float* verts, float* vels, float* times, float* colors, int N) {
@@ -700,7 +701,7 @@ void display(SDL_Window* window, int r)
   if (id>=0) glUniform1i(id,0);
   // ^ current bound texture, star.bmp
   id = glGetUniformLocation(shader, "size");
-  if (id>=0) glUniform1f(id,0.2);
+  if (id>=0) glUniform1f(id,1.0);
   glEnable(GL_BLEND);
   glBlendFunc(GL_ONE,GL_ONE);
 
@@ -755,9 +756,9 @@ void display(SDL_Window* window, int r)
         for (int k=0; k < M; ++k) {
           glColor3f(1.0,0.5,0.0);
           glVertex3f(i, j, k);
-          float x = h_gvels[4*(i*M*M + j*M + k)  ]*5.0;
-          float y = h_gvels[4*(i*M*M + j*M + k)+1]*5.0;
-          float z = h_gvels[4*(i*M*M + j*M + k)+2]*5.0;
+          float x = h_gvels[4*(i*M*M + j*M + k)  ]*10.0;
+          float y = h_gvels[4*(i*M*M + j*M + k)+1]*10.0;
+          float z = h_gvels[4*(i*M*M + j*M + k)+2]*10.0;
           //float x = 0.0;
           //float y = 0.0;
           //float z = h_gvels[4*(i*M*M + j*M + k)+3]*10.0;
@@ -1088,11 +1089,19 @@ bool handleEvents()
             break;
 
           case SDL_SCANCODE_COMMA:
-            tick_period /= pow(2,0.25);
+            tick_period *= pow(2,0.25);
             break;
 
           case SDL_SCANCODE_PERIOD:
-            tick_period *= pow(2,0.25);
+            tick_period /= pow(2,0.25);
+            break;
+
+          case SDL_SCANCODE_LEFTBRACKET:
+            decay_rate *= pow(2,0.25);
+            break;
+
+          case SDL_SCANCODE_RIGHTBRACKET:
+            decay_rate /= pow(2,0.25);
             break;
 
           default:
